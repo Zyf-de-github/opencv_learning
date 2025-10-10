@@ -23,112 +23,112 @@
 
 
 
-int main() {
-    // 创建一个带有网格的测试图像，这样透视效果更明显
-    cv::Mat image(400, 600, CV_8UC3, cv::Scalar(255, 255, 255));
-
-    // 绘制网格线
-    for (int i = 0; i <= image.rows; i += 20) {
-        cv::line(image, cv::Point(0, i), cv::Point(image.cols, i), cv::Scalar(200, 200, 200), 1);
-    }
-    for (int i = 0; i <= image.cols; i += 20) {
-        cv::line(image, cv::Point(i, 0), cv::Point(i, image.rows), cv::Scalar(200, 200, 200), 1);
-    }
-
-    // 绘制中心十字和文字
-    cv::line(image, cv::Point(image.cols / 2, 0), cv::Point(image.cols / 2, image.rows), cv::Scalar(0, 0, 255), 2);
-    cv::line(image, cv::Point(0, image.rows / 2), cv::Point(image.cols, image.rows / 2), cv::Scalar(0, 0, 255), 2);
-    cv::putText(image, "Original Image", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
-
-    // 定义原始图像的四个角点
-    std::vector<cv::Point2f> srcPoints;
-    srcPoints.push_back(cv::Point2f(0, 0));                      // 左上角
-    srcPoints.push_back(cv::Point2f(image.cols - 1, 0));         // 右上角
-    srcPoints.push_back(cv::Point2f(image.cols - 1, image.rows - 1)); // 右下角
-    srcPoints.push_back(cv::Point2f(0, image.rows - 1));         // 左下角
-
-    // 1. 仿射变换的目标点（保持平行性）
-    std::vector<cv::Point2f> dstAffinePoints;
-    dstAffinePoints.push_back(cv::Point2f(50, 50));              // 左上角
-    dstAffinePoints.push_back(cv::Point2f(image.cols - 50, 80)); // 右上角
-    dstAffinePoints.push_back(cv::Point2f(image.cols - 50, image.rows - 50)); // 右下角
-    dstAffinePoints.push_back(cv::Point2f(50, image.rows - 80)); // 左下角
-
-    // 2. 透视变换的目标点（产生强烈的透视效果）
-    std::vector<cv::Point2f> dstPerspectivePoints;
-    // 强烈的透视效果：左上和左下向右移动，右上和右下向左移动
-    dstPerspectivePoints.push_back(cv::Point2f(200, 50));        // 左上角（向右移动）
-    dstPerspectivePoints.push_back(cv::Point2f(image.cols - 200, 50)); // 右上角（向左移动）
-    dstPerspectivePoints.push_back(cv::Point2f(image.cols - 100, image.rows - 50)); // 右下角（向左移动）
-    dstPerspectivePoints.push_back(cv::Point2f(100, image.rows - 50)); // 左下角（向右移动）
-
-    // 计算仿射变换矩阵
-    cv::Mat affineMatrix = cv::getAffineTransform(
-        std::vector<cv::Point2f>(srcPoints.begin(), srcPoints.begin() + 3),
-        std::vector<cv::Point2f>(dstAffinePoints.begin(), dstAffinePoints.begin() + 3)
-    );
-
-    // 计算透视变换矩阵
-    cv::Mat perspectiveMatrix = cv::getPerspectiveTransform(srcPoints, dstPerspectivePoints);
-
-    // 应用变换
-    cv::Mat affineTransformed;
-    cv::warpAffine(image, affineTransformed, affineMatrix, image.size());
-
-    cv::Mat perspectiveTransformed;
-    cv::warpPerspective(image, perspectiveTransformed, perspectiveMatrix, image.size());
-
-    // 绘制变换前后的点
-    cv::Mat imageWithPoints = image.clone();
-    cv::Mat affineWithPoints = affineTransformed.clone();
-    cv::Mat perspectiveWithPoints = perspectiveTransformed.clone();
-
-    // 绘制原始点
-    for (const auto& pt : srcPoints) {
-        cv::circle(imageWithPoints, pt, 8, cv::Scalar(0, 0, 255), -1); // 红色点
-    }
-
-    // 绘制仿射变换点
-    for (int i = 0; i < 4; i++) {
-        cv::circle(affineWithPoints, dstAffinePoints[i], 8, cv::Scalar(0, 255, 0), -1); // 绿色点
-        cv::line(affineWithPoints, dstAffinePoints[i], dstAffinePoints[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
-    }
-
-    // 绘制透视变换点
-    for (int i = 0; i < 4; i++) {
-        cv::circle(perspectiveWithPoints, dstPerspectivePoints[i], 8, cv::Scalar(255, 0, 0), -1); // 蓝色点
-        cv::line(perspectiveWithPoints, dstPerspectivePoints[i], dstPerspectivePoints[(i + 1) % 4], cv::Scalar(255, 0, 0), 2);
-    }
-
-    // 添加文字说明
-    cv::putText(imageWithPoints, "Original", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
-    cv::putText(affineWithPoints, "Affine Transform", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
-    cv::putText(perspectiveWithPoints, "Perspective Transform", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
-
-    // 调整窗口大小并显示
-    cv::namedWindow("Original Image", cv::WINDOW_NORMAL);
-    cv::namedWindow("Affine Transform", cv::WINDOW_NORMAL);
-    cv::namedWindow("Perspective Transform", cv::WINDOW_NORMAL);
-
-    cv::resizeWindow("Original Image", 600, 400);
-    cv::resizeWindow("Affine Transform", 600, 400);
-    cv::resizeWindow("Perspective Transform", 600, 400);
-
-    cv::imshow("Original Image", imageWithPoints);
-    cv::imshow("Affine Transform", affineWithPoints);
-    cv::imshow("Perspective Transform", perspectiveWithPoints);
-
-    // 打印说明
-    std::cout << "=== 变换效果对比 ===" << std::endl;
-    std::cout << "仿射变换: 保持平行性，网格线仍然平行" << std::endl;
-    std::cout << "透视变换: 产生3D透视效果，平行线在远处相交" << std::endl;
-    std::cout << "注意观察网格线的变化！" << std::endl;
-
-    // 等待按键
-    cv::waitKey(0);
-
-    return 0;
-}
+//int main() {
+//    // 创建一个带有网格的测试图像，这样透视效果更明显
+//    cv::Mat image(400, 600, CV_8UC3, cv::Scalar(255, 255, 255));
+//
+//    // 绘制网格线
+//    for (int i = 0; i <= image.rows; i += 20) {
+//        cv::line(image, cv::Point(0, i), cv::Point(image.cols, i), cv::Scalar(200, 200, 200), 1);
+//    }
+//    for (int i = 0; i <= image.cols; i += 20) {
+//        cv::line(image, cv::Point(i, 0), cv::Point(i, image.rows), cv::Scalar(200, 200, 200), 1);
+//    }
+//
+//    // 绘制中心十字和文字
+//    cv::line(image, cv::Point(image.cols / 2, 0), cv::Point(image.cols / 2, image.rows), cv::Scalar(0, 0, 255), 2);
+//    cv::line(image, cv::Point(0, image.rows / 2), cv::Point(image.cols, image.rows / 2), cv::Scalar(0, 0, 255), 2);
+//    cv::putText(image, "Original Image", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+//
+//    // 定义原始图像的四个角点
+//    std::vector<cv::Point2f> srcPoints;
+//    srcPoints.push_back(cv::Point2f(0, 0));                      // 左上角
+//    srcPoints.push_back(cv::Point2f(image.cols - 1, 0));         // 右上角
+//    srcPoints.push_back(cv::Point2f(image.cols - 1, image.rows - 1)); // 右下角
+//    srcPoints.push_back(cv::Point2f(0, image.rows - 1));         // 左下角
+//
+//    // 1. 仿射变换的目标点（保持平行性）
+//    std::vector<cv::Point2f> dstAffinePoints;
+//    dstAffinePoints.push_back(cv::Point2f(50, 50));              // 左上角
+//    dstAffinePoints.push_back(cv::Point2f(image.cols - 50, 80)); // 右上角
+//    dstAffinePoints.push_back(cv::Point2f(image.cols - 50, image.rows - 50)); // 右下角
+//    dstAffinePoints.push_back(cv::Point2f(50, image.rows - 80)); // 左下角
+//
+//    // 2. 透视变换的目标点（产生强烈的透视效果）
+//    std::vector<cv::Point2f> dstPerspectivePoints;
+//    // 强烈的透视效果：左上和左下向右移动，右上和右下向左移动
+//    dstPerspectivePoints.push_back(cv::Point2f(200, 50));        // 左上角（向右移动）
+//    dstPerspectivePoints.push_back(cv::Point2f(image.cols - 200, 50)); // 右上角（向左移动）
+//    dstPerspectivePoints.push_back(cv::Point2f(image.cols - 100, image.rows - 50)); // 右下角（向左移动）
+//    dstPerspectivePoints.push_back(cv::Point2f(100, image.rows - 50)); // 左下角（向右移动）
+//
+//    // 计算仿射变换矩阵
+//    cv::Mat affineMatrix = cv::getAffineTransform(
+//        std::vector<cv::Point2f>(srcPoints.begin(), srcPoints.begin() + 3),
+//        std::vector<cv::Point2f>(dstAffinePoints.begin(), dstAffinePoints.begin() + 3)
+//    );
+//
+//    // 计算透视变换矩阵
+//    cv::Mat perspectiveMatrix = cv::getPerspectiveTransform(srcPoints, dstPerspectivePoints);
+//
+//    // 应用变换
+//    cv::Mat affineTransformed;
+//    cv::warpAffine(image, affineTransformed, affineMatrix, image.size());
+//
+//    cv::Mat perspectiveTransformed;
+//    cv::warpPerspective(image, perspectiveTransformed, perspectiveMatrix, image.size());
+//
+//    // 绘制变换前后的点
+//    cv::Mat imageWithPoints = image.clone();
+//    cv::Mat affineWithPoints = affineTransformed.clone();
+//    cv::Mat perspectiveWithPoints = perspectiveTransformed.clone();
+//
+//    // 绘制原始点
+//    for (const auto& pt : srcPoints) {
+//        cv::circle(imageWithPoints, pt, 8, cv::Scalar(0, 0, 255), -1); // 红色点
+//    }
+//
+//    // 绘制仿射变换点
+//    for (int i = 0; i < 4; i++) {
+//        cv::circle(affineWithPoints, dstAffinePoints[i], 8, cv::Scalar(0, 255, 0), -1); // 绿色点
+//        cv::line(affineWithPoints, dstAffinePoints[i], dstAffinePoints[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
+//    }
+//
+//    // 绘制透视变换点
+//    for (int i = 0; i < 4; i++) {
+//        cv::circle(perspectiveWithPoints, dstPerspectivePoints[i], 8, cv::Scalar(255, 0, 0), -1); // 蓝色点
+//        cv::line(perspectiveWithPoints, dstPerspectivePoints[i], dstPerspectivePoints[(i + 1) % 4], cv::Scalar(255, 0, 0), 2);
+//    }
+//
+//    // 添加文字说明
+//    cv::putText(imageWithPoints, "Original", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+//    cv::putText(affineWithPoints, "Affine Transform", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+//    cv::putText(perspectiveWithPoints, "Perspective Transform", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 0, 0), 2);
+//
+//    // 调整窗口大小并显示
+//    cv::namedWindow("Original Image", cv::WINDOW_NORMAL);
+//    cv::namedWindow("Affine Transform", cv::WINDOW_NORMAL);
+//    cv::namedWindow("Perspective Transform", cv::WINDOW_NORMAL);
+//
+//    cv::resizeWindow("Original Image", 600, 400);
+//    cv::resizeWindow("Affine Transform", 600, 400);
+//    cv::resizeWindow("Perspective Transform", 600, 400);
+//
+//    cv::imshow("Original Image", imageWithPoints);
+//    cv::imshow("Affine Transform", affineWithPoints);
+//    cv::imshow("Perspective Transform", perspectiveWithPoints);
+//
+//    // 打印说明
+//    std::cout << "=== 变换效果对比 ===" << std::endl;
+//    std::cout << "仿射变换: 保持平行性，网格线仍然平行" << std::endl;
+//    std::cout << "透视变换: 产生3D透视效果，平行线在远处相交" << std::endl;
+//    std::cout << "注意观察网格线的变化！" << std::endl;
+//
+//    // 等待按键
+//    cv::waitKey(0);
+//
+//    return 0;
+//}
 
 //int main() {
 //    // 1. 创建一个视频捕获对象，参数0表示打开默认摄像头
